@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modular Recruiting Helper</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
+    .scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .message-block { white-space: pre-wrap; word-wrap: break-word; }
+    .btn-action { transition: all 0.15s ease-in-out; }
+    .btn-action:active { transform: scale(0.97); }
+    .category-btn.active { background-color: #e0f2fe; color: #0369a1; font-weight: 600; }
+    .category-btn .category-actions { opacity: 0; transition: opacity 0.2s; }
+    .category-btn:hover .category-actions { opacity: 1; }
+    
+    /* Drag and drop styles */
+    .draggable-block { cursor: grab; }
+    .draggable-block.dragging { opacity: 0.5; cursor: grabbing; background-color: #f0f9ff; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+  <div id="app" class="flex h-screen overflow-hidden">
+    <!-- Categories Sidebar -->
+    <aside class="w-72 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col">
+      <div class="p-4 border-b border-slate-200">
+        <h1 class="text-xl font-bold">Бібліотека Шаблонів</h1>
+        <p class="text-xs text-slate-500">Редагуйте та додавайте блоки</p>
+      </div>
+      <nav id="category-list" class="flex-1 p-2 space-y-1 overflow-y-auto scrollbar"></nav>
+      <div class="p-2 border-t border-slate-200">
+        <button id="add-category-btn" class="btn-action w-full text-center px-3 py-2.5 rounded-md text-sm text-slate-600 hover:bg-slate-100 font-medium">+ Нова категорія</button>
+      </div>
+      <div class="p-4 border-t border-slate-200">
+        <div class="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+          <button id="lang-uk" class="btn-action w-full text-sm py-2 rounded-md font-semibold bg-white shadow-sm text-sky-600">Українська</button>
+          <button id="lang-en" class="btn-action w-full text-sm py-2 rounded-md font-medium text-slate-600">English</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Message Blocks Panel -->
+    <main class="flex-1 bg-slate-50 flex flex-col overflow-hidden">
+        <div id="blocks-header" class="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
+            <!-- Header for blocks will be rendered here -->
+        </div>
+        <div id="blocks-list" class="flex-1 p-4 overflow-y-auto scrollbar space-y-3">
+             <!-- Blocks will be rendered here -->
+        </div>
+    </main>
+  </div>
+  
+  <!-- Edit/Create Block Modal -->
+  <div id="edit-block-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h3 id="block-modal-title" class="text-lg font-bold">Редагувати блок</h3>
+        <button data-close-modal="edit-block-modal" class="text-slate-400 hover:text-slate-600">&times;</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto scrollbar">
+        <div>
+          <label for="edit-title" class="block text-sm font-medium text-slate-700 mb-1">Назва блоку</label>
+          <input type="text" id="edit-title" class="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" placeholder="Наприклад: 'Привітання (є CV)'">
+        </div>
+        <div>
+          <label for="edit-uk" class="block text-sm font-medium text-slate-700 mb-1">Українська версія</label>
+          <textarea id="edit-uk" class="w-full h-32 p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"></textarea>
+        </div>
+        <div>
+          <label for="edit-en" class="block text-sm font-medium text-slate-700 mb-1">English version</label>
+          <textarea id="edit-en" class="w-full h-32 p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"></textarea>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t flex justify-end gap-3">
+        <button data-close-modal="edit-block-modal" class="btn-action px-5 py-2 rounded-md bg-slate-200 hover:bg-slate-300 text-sm font-semibold text-slate-700">Скасувати</button>
+        <button id="save-block-btn" class="btn-action px-5 py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Зберегти</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit/Create Category Modal -->
+  <div id="edit-category-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg transform transition-all">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h3 id="category-modal-title" class="text-lg font-bold">Нова категорія</h3>
+        <button data-close-modal="edit-category-modal" class="text-slate-400 hover:text-slate-600">&times;</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label for="category-title" class="block text-sm font-medium text-slate-700 mb-1">Назва категорії</label>
+          <input type="text" id="category-title" class="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" placeholder="Наприклад: '👋 Співбесіда з клієнтом'">
+        </div>
+        <div>
+          <label for="category-description" class="block text-sm font-medium text-slate-700 mb-1">Опис</label>
+          <input type="text" id="category-description" class="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" placeholder="Короткий опис цієї категорії">
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t flex justify-end gap-3">
+        <button data-close-modal="edit-category-modal" class="btn-action px-5 py-2 rounded-md bg-slate-200 hover:bg-slate-300 text-sm font-semibold text-slate-700">Скасувати</button>
+        <button id="save-category-btn" class="btn-action px-5 py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Зберегти</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
+      <div class="p-6 text-center">
+         <svg aria-hidden="true" class="mx-auto mb-4 w-14 h-14 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <h3 id="confirm-message" class="mb-5 text-lg font-normal text-slate-600"></h3>
+        <button id="confirm-delete-btn" class="btn-action text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">
+            Так, видалити
+        </button>
+        <button id="cancel-delete-btn" class="btn-action text-slate-500 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10">
+            Скасувати
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-emerald-600 text-white py-2 px-4 rounded-lg shadow-lg opacity-0 transform translate-y-2 transition-all duration-300 pointer-events-none">
+    Скопійовано!
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const defaultData = {
+            "categories": [
+                { "id": "first_contact", "title": "👋 Перший контакт", "description": "Блоки для першого звернення до кандидата." },
+                { "id": "about", "title": "ℹ️ Про компанію та етапи", "description": "Розкажіть про себе та подальші кроки." },
+                { "id": "test_video", "title": "🧪 Тест та Відео", "description": "Надсилання тестових завдань та інструкцій." },
+                { "id": "interview", "title": "🗓️ Інтерв'ю", "description": "Запрошення та нагадування про співбесіду." },
+                { "id": "offer", "title": "🎉 Офер", "description": "Формування та надсилання пропозиції роботи." },
+                { "id": "onboarding", "title": "🚀 Онбординг", "description": "Все для успішного старту нового співробітника." },
+                { "id": "follow_up", "title": "🔔 Фолоу-ап", "description": "Нагадування кандидатам, які не відповіли." },
+                { "id": "rejection", "title": "🚫 Відмова", "description": "Шаблони для коректної відмови кандидатам." }
+            ],
+            "blocks": [
+                { "id": "fc1", "category": "first_contact", "title": "Привітання (є CV)", "uk": "Привіт! 👋 Дякую, що надіслали резюме та зацікавились нашою компанією.", "en": "Hi! 👋 Thanks for sending your resume and for your interest in our company." },
+                { "id": "fc2", "category": "first_contact", "title": "Привітання (немає CV)", "uk": "Привіт! 👋 Дякую за ваш інтерес до Remote Employees.", "en": "Hi! 👋 Thanks for your interest in Remote Employees." },
+                { "id": "fc3", "category": "first_contact", "title": "Запит резюме", "uk": "Щоб ми могли познайомитись ближче, надішліть, будь ласка, своє резюме та кілька слів про себе.", "en": "To help us get to know you better, could you please send over your resume and a few words about yourself." },
+                { "id": "fc4", "category": "first_contact", "title": "Запитання для скрінінгу", "uk": "Щоб краще зрозуміти, чи підходимо ми один одному, можете відповісти на кілька коротких запитань?\n\n1. Скільки вам років?\n2. Чи навчаєтесь або працюєте десь зараз на повну ставку?\n3. Чи розглядаєте для себе повну зайнятість у віддаленому форматі (пн-пт)?\n4. Як би ви оцінили свій рівень англійської?", "en": "To get a better sense of whether we're a good fit, could you answer a few quick questions?\n\n1. How old are you?\n2. Are you currently working or studying full-time?\n3. Are you open to a full-time, remote position (Mon-Fri)?\n4. How would you rate your English proficiency?" },
+                { "id": "fc5", "category": "first_contact", "title": "Пропозиція по грошах", "uk": "І одразу розповім про фінанси, щоб зекономити наш час:\nМи пропонуємо ставку та бонуси. Рівень зарплати обговорюємо індивідуально. На старті можемо запропонувати $300–$400 + бонуси. Буде чудово, якщо ви поділитесь своїми фінансовими очікуваннями 😊", "en": "And to save us both time, a quick note on compensation:\nWe offer a base salary plus bonuses. The salary is tailored to your skills. To start, we're thinking in the $300–$400 range + bonuses. It would be great if you could share your salary expectations too 😊" },
+                { "id": "ab1", "category": "about", "title": "Про компанію та графік", "uk": "Дякую за відповіді! 🙌\n\nТепер трохи розповім про нас:\nRemote Employees — це аутстафф-компанія, ми допомагаємо українським спеціалістам знаходити роботу в проєктах з ЄС та США.\n🌍 Наш сайт: https://rem-s.com/ua\n\n🕘 Графік роботи:\nПісля навчання можна буде обрати зручний для себе час: з 9:00 до 18:00 або з 15:00 до 24:00 (з годинною перервою). Працюємо з понеділка по п'ятницю.", "en": "Thanks for the info! 🙌\n\nHere’s a little bit about us:\nRemote Employees is an outstaffing company that connects Ukrainian talent with projects in the EU and the US.\n🌍 Our website: https://rem-s.com/ua\n\n🕘 Work Schedule:\nAfter training, you can pick a shift: 9 AM–6 PM or 3 PM–12 AM (with a one-hour break). We work Monday to Friday." },
+                { "id": "ab2", "category": "about", "title": "Про зарплату та етапи", "uk": "💵 Зарплата:\nУ нас ставка + бонуси, які залежать від ваших результатів. На старті зазвичай пропонуємо $300–$500 + бонуси. Ми також регулярно переглядаємо зарплату.\n\n📌 Як усе відбувається:\n1. Невеликий онлайн-тест з англійської (10-15 хв).\n2. Коротка відеовізитка про себе (2-3 хв, англійською).\n3. Співбесіда з керівником.", "en": "💵 Salary:\nWe offer a base salary plus bonuses tied to your performance. The starting range is typically $300–$500 + bonuses. We also have regular salary reviews.\n\n📌 Our Hiring Process:\n1. A short online English test (10-15 mins).\n2. A brief video introduction (2-3 mins, in English).\n3. An interview with the department head." },
+                { "id": "ab3", "category": "about", "title": "Заклик до дії", "uk": "Якщо умови вам підходять, я надішлю посилання на тест. Що скажете? 😉", "en": "If this all sounds good to you, I can send over the link to the test. How does that sound? 😉" },
+                { "id": "tv1", "category": "test_video", "title": "Надсилання тесту", "uk": "Чудово! Тоді ось посилання на наш тест з англійської:\n🔗 https://forms.gle/knuqogPtoZaEHfQ69\n\nВін нескладний і займе до 15 хвилин. Дайте знати, як закінчите 😊", "en": "Great! Here’s the link to our English test:\n🔗 https://forms.gle/knuqogPtoZaEHfQ69\n\nIt's pretty straightforward and should take about 15 minutes. Just give me a heads-up once you're done 😊" },
+                { "id": "tv2", "category": "test_video", "title": "Фідбек (низький бал тесту)", "uk": "Привіт, дякую, що пройшли тест. Він трохи нижчий, ніж ми очікували, але я хотіла б уточнити: наскільки впевнено ви почуваєтесь, спілкуючись англійською усно? Якщо вважаєте, що зможете з цим впоратись — дайте знати! 🙌", "en": "Hi, thanks for taking the test. The score is a bit lower than we look for, but I'd like to clarify: how comfortable do you feel with spoken English? If you feel confident you can handle it, please let me know! 🙌" },
+                { "id": "tv3", "category": "test_video", "title": "Завдання для відео (НЕЗМІННИЙ)", "uk": "Дякую, отримала ваш тест! Результат — /60, це чудово, вітаю! 🙌\n\nНаступний крок — це коротка відео-візитка (до 50 секунд). Це допоможе нам познайомитись трохи ближче.\n\n📌 Ось кілька порад, щоб усе вийшло якнайкраще:\n— знімайте горизонтально на світлому фоні, де достатньо світла;\n— у кадрі має бути видно вас приблизно по пояс, краще без зайвих рухів руками;\n— використовуйте основну камеру, а не фронтальну.\n\nПриклад тексту:\nHi, my name is [ім’я]. I work as [посада]. I have skills in [програми]. I speak [мови]. I studied at [університет/курси]. I worked at [досвід]. I would be happy to work with you. Goodbye!\n\n⚠️ Ваше відео нікуди не потрапить, якщо ви не пройдете відбір.\nІнструкції: https://rem-s.com/ua/videointerview", "en": "Thanks, I've received your test! Your score is /60, which is great, congratulations! 🙌\n\nThe next step is a short video intro (up to 50 seconds). This will help us get to know you a little better.\n\n📌 Here are a few tips to make it shine:\n— Record horizontally against a light background with good lighting.\n— You should be visible from the waist up; try to avoid too many hand gestures.\n— Use your phone’s main camera, not the front-facing one.\n\nSample text:\nHi, my name is [Name]. I work as [position]. I have skills in [programs]. I speak [languages]. I studied at [university/courses]. I worked at [experience]. I would be happy to work with you. Goodbye!\n\n⚠️ If you don’t pass the selection, the video will not be used or shared anywhere.\nInstructions: https://rem-s.com/ua/videointerview" },
+                { "id": "tv4", "category": "test_video", "title": "Фідбек після відео", "uk": "Дякую за відео! Вийшло чудово ✨\nМи подивимось його найближчим часом і повернемось до вас із фідбеком. Постараємось не затягувати 😉", "en": "Thank you for the video, it turned out great! ✨\nWe'll review it soon and get back to you with the next steps. We'll try to be quick about it 😉" },
+                { "id": "iv1", "category": "interview", "title": "Запрошення на співбесіду", "uk": "Запрошуємо вас на групову онлайн-співбесіду, яка відбудеться:\n🗓 01/08/2025, о 16:30\n🔗 Посилання на зустріч: http://meet.google.com/fqf-vxgn-qqs\n\nКілька порад:\n💻 Краще приєднатись з комп'ютера, перевірте камеру та мікрофон.\n👥 Це буде групова зустріч, не соромтесь ставити питання.\n✨ Можна подивитись наше відео про компанію: [посилання]\n\n✅ Будь ласка, дайте знати, чи зможете приєднатись. Чекаємо на зустріч!", "en": "We'd like to invite you to a group online interview on:\n🗓 01/08/2025, at 16:30 Kyiv time\n🔗 Meeting link: http://meet.google.com/fqf-vxgn-qqs\n\nA few tips:\n💻 It's best to join from a computer; please check your camera and mic.\n👥 This will be a group call, so feel free to ask questions.\n✨ You can watch our short video about the company: [video link]\n\n✅ Please reply to confirm if you can make it. Looking forward to meeting you!" },
+                { "id": "iv2", "category": "interview", "title": "Нагадування про співбесіду", "uk": "Привіт! 👋 Нагадую, що у вас сьогодні співбесіда. Чекати на вас? 🙂\nНе хвилюйтеся, це буде невимушена розмова. Все буде добре! 🙌", "en": "Hi! 👋 Just a friendly reminder that you have an interview today. Should we expect you? 🙂\nDon't worry, it’ll be a relaxed conversation. You'll do great! 🙌" },
+                { "id": "of1", "category": "offer", "title": "Офер (основна частина)", "uk": "Вітаю! У мене для вас чудові новини 🥳\nМи були дуже вражені після співбесіди і раді запросити вас до команди!\n\n🔹 Пропонуємо стартову зарплату: [Сума] / місяць + бонуси\n🔹 Дата виходу: [Дата]\n🔹 Посада: [Назва посади]", "en": "Hi! I have some great news for you 🥳\nWe were very impressed and would be thrilled to offer you a position on the team!\n\n🔹 Starting salary: [Amount] / month + bonuses\n🔹 Start date: [Date]\n🔹 Position: [Position Name]" },
+                { "id": "of2", "category": "offer", "title": "Обов'язки (приклад)", "uk": "[Скопіюйте та вставте обов'язки для відповідної посади]\n\n**📌 Оператор чата / Лідогенератор:**\n• Пошук інформації в LinkedIn, ресерч контактів і компаній.\n• Спілкування з потенційними клієнтами.\n• Організація дзвінків для команди відділу продажів.", "en": "[Copy and paste the responsibilities for the relevant position]\n\n**📌 Chat Operator / Lead Generator:**\n• Researching information on LinkedIn, contacts, and companies.\n• Communicating with potential clients.\n• Organizing calls for the sales team." },
+                { "id": "of3", "category": "offer", "title": "Заклик до дії (офер)", "uk": "Скажіть, будь ласка, чи цікава вам наша пропозиція? Якщо так, я надішлю вам договір для ознайомлення 😊", "en": "Please let us know if you accept our offer. If it's a yes, I'll send over the contract for you to look at 😊" },
+                { "id": "onb1", "category": "onboarding", "title": "Запит даних для договору", "uk": "Чудово, що ви з нами! 😊\nЩоб я могла підготувати договір, надішліть, будь ласка:\n\n1. Ваше повне ім'я англійською.\n2. Актуальний номер телефону.\n3. Електронну пошту.", "en": "Great to have you on board! 😊\nTo prepare the agreement, I'll just need you to send over:\n\n1. Your full name in English.\n2. Your current phone number.\n3. Your email address." },
+                { "id": "onb2", "category": "onboarding", "title": "Договір надіслано", "uk": "Щойно надіслала вам на пошту договір. Перевірте, будь ласка, папку \"Вхідні\" (і \"Спам\").\nТакож, будь ласка, надішліть мені якісні фото ID-картки або закордонного паспорта (з обох сторін).", "en": "I've just sent the contract to your email. Please check your inbox (and spam folder).\nAlso, could you please send me high-quality photos of your ID card or international passport (both sides)?" },
+                { "id": "onb3", "category": "onboarding", "title": "Інструкції на перший день", "uk": "Все отримала, дякую! ✅\nРада вітати в команді! Завтра ваш перший робочий день 🚀\n\nОсь кілька моментів:\n— Робочий день починається о 9:00.\n— Для спілкування ми використовуємо Discord.\n— Перед початком потрібно буде створити робочу пошту та профіль у LinkedIn.\n\nДо зустрічі завтра на онбордингу!", "en": "Got everything, thank you! ✅\nWelcome to the team! Tomorrow is your first day 🚀\n\nA few things to prepare:\n— The workday starts at 9:00 AM.\n— We use Discord for team communication.\n— Before you start, you'll need to create a work email and a LinkedIn profile.\n\nSee you at onboarding tomorrow!" },
+                { "id": "fu1", "category": "follow_up", "title": "Нагадування (після відгуку)", "uk": "Доброго дня!\nМи готуємо списки на співбесіди та хотіли написати, що пам’ятаємо про вас 🙌\nБуде чудово, якщо напишете, як у вас справи і чи все ще актуальна участь у відборі)", "en": "Good day!\nWe are preparing the interview lists and wanted to let you know that we remember you 🙌\nIt would be great if you could tell us how you are and if participating in the selection is still relevant for you.)" },
+                { "id": "fu2", "category": "follow_up", "title": "Коротке нагадування", "uk": "Привіт 🙂\nНагадую про наше повідомлення, будемо вдячні за апдейт)", "en": "Hi 🙂\nJust a reminder about our message, we would appreciate an update.)" },
+                { "id": "fu3", "category": "follow_up", "title": "Нагадування (пропозиція)", "uk": "Доброго дня)\nЯкщо вам зручно, дайте знати щодо нашої пропозиції. Якщо неактуально, то теж будемо вдячні за апдейт 🙂", "en": "Good day)\nIf it's convenient for you, please let us know about our offer. If it's no longer relevant, we would also appreciate an update 🙂" },
+                { "id": "fu4", "category": "follow_up", "title": "Ввічливе нагадування", "uk": "Доброго дня! 👋\nХотіли нагадати про нашу попередню розмову. Ми все ще зацікавлені у співпраці з вами і будемо раді отримати відповідь. Якщо зараз вам неактуально, то дайте знати, будь ласка)", "en": "Good day! 👋\nWe wanted to remind you about our previous conversation. We are still interested in working with you and would be glad to get a response. If it is not relevant for you at the moment, please let us know.)" },
+                { "id": "fu5", "category": "follow_up", "title": "Останнє нагадування", "uk": "Привіт! \nПросто хотіла дізнатись, чи цікаво було б рухатись далі?\nЯкщо ваші плани змінилися, то теж не страшно, просто дайте знати 😊", "en": "Hi!\nI just wanted to know if you would be interested in moving forward?\nIf your plans have changed, that's okay too, just let us know 😊" },
+                { "id": "rej1", "category": "rejection", "title": "Відмова (позиція на паузі)", "uk": "Привіт! Дякую за ваш відгук. На жаль, вакансія, на яку ви відгукнулись, вже тимчасово закрита. Якщо ви не проти, надішліть, будь ласка, своє резюме, і ми збережемо його в базі. Як тільки з'явиться щось підходяще, ми одразу вам напишемо!", "en": "Hi! Thanks for your application. Unfortunately, the position you applied for is temporarily on hold. If you're open to it, please send over your resume, and we'll keep it in our talent pool. As soon as a suitable role opens up, we'll reach out!" },
+                { "id": "rej2", "category": "rejection", "title": "Відмова (студент, неповна зайнятість)", "uk": "Дякую за уточнення. На жаль, ця позиція вимагає повної зайнятості в робочі години, тому поєднувати її з навчанням буде справді складно. Цього разу ми не зможемо запросити вас далі, але бажаю вам успіхів у пошуках! 🌿", "en": "Thanks for clarifying. Unfortunately, this position requires full-time availability during business hours, so combining it with your studies would be really tough. We won’t be able to move forward this time, but I wish you the best of luck in your search! 🌿" },
+                { "id": "rej3", "category": "rejection", "title": "Відмова (вік)", "uk": "Дякуємо за ваш інтерес до вакансії. Наразі для цієї ролі ми шукаємо кандидатів у певній віковій категорії, тому не зможемо рухатись далі. Бажаємо вам успіхів у пошуках! 🌿", "en": "Thank you for your interest. For this particular role, we are currently looking for candidates within a specific age range, so we won't be able to move forward. Wishing you all the best in your search! 🌿" },
+                { "id": "rej4", "category": "rejection", "title": "Відмова (після CV/тесту)", "uk": "Привіт, дякуємо за ваш час. Наразі ми вирішили рухатися далі з іншими кандидатами, чий досвід трохи більше відповідає вимогам. Бажаємо успіхів у подальших пошуках!", "en": "Hi, thank you for your time. We have decided to move forward with other candidates whose experience is a closer match to the requirements. We wish you the best of luck in your search!" }
+            ]
+        };
+        
+        const state = {
+            lang: 'uk',
+            activeCategory: defaultData.categories[0].id,
+        };
+
+        const appData = {
+            categories: [],
+            blocks: [],
+        };
+        
+        let draggedBlockId = null;
+        let itemToDelete = { id: null, type: null };
+
+        const categoryListEl = document.getElementById('category-list');
+        const blocksHeaderEl = document.getElementById('blocks-header');
+        const blocksListEl = document.getElementById('blocks-list');
+        const langUkBtn = document.getElementById('lang-uk');
+        const langEnBtn = document.getElementById('lang-en');
+        const toastEl = document.getElementById('toast');
+        const addCategoryBtn = document.getElementById('add-category-btn');
+        
+        // Block Modal elements
+        const blockModalEl = document.getElementById('edit-block-modal');
+        const blockModalTitleEl = document.getElementById('block-modal-title');
+        const editTitleInput = document.getElementById('edit-title');
+        const editUkTextarea = document.getElementById('edit-uk');
+        const editEnTextarea = document.getElementById('edit-en');
+        const saveBlockBtn = document.getElementById('save-block-btn');
+        
+        // Category Modal elements
+        const categoryModalEl = document.getElementById('edit-category-modal');
+        const categoryModalTitleEl = document.getElementById('category-modal-title');
+        const categoryTitleInput = document.getElementById('category-title');
+        const categoryDescriptionInput = document.getElementById('category-description');
+        const saveCategoryBtn = document.getElementById('save-category-btn');
+
+        // Confirmation Modal elements
+        const confirmModalEl = document.getElementById('confirm-modal');
+        const confirmMessageEl = document.getElementById('confirm-message');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+
+        let toastTimeout;
+
+        function loadAppData() {
+            const savedCategories = JSON.parse(localStorage.getItem('recruitingHelperCategories'));
+            const savedBlocks = JSON.parse(localStorage.getItem('recruitingHelperBlocks'));
+
+            appData.categories = savedCategories || JSON.parse(JSON.stringify(defaultData.categories));
+            appData.blocks = savedBlocks || JSON.parse(JSON.stringify(defaultData.blocks));
+        }
+
+        function saveAppData() {
+            localStorage.setItem('recruitingHelperCategories', JSON.stringify(appData.categories));
+            localStorage.setItem('recruitingHelperBlocks', JSON.stringify(appData.blocks));
+        }
+
+        function showToast(message) {
+            toastEl.textContent = message;
+            clearTimeout(toastTimeout);
+            toastEl.classList.remove('opacity-0', 'translate-y-2');
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.add('opacity-0', 'translate-y-2');
+            }, 2000);
+        }
+
+        async function copyToClipboard(text) {
+             try {
+                await navigator.clipboard.writeText(text);
+                showToast(state.lang === 'uk' ? 'Скопійовано!' : 'Copied!');
+            } catch (err) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = "fixed"; textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    if (document.execCommand('copy')) showToast(state.lang === 'uk' ? 'Скопійовано!' : 'Copied!');
+                } catch (fallbackErr) { console.error('Fallback copy failed:', fallbackErr); }
+                document.body.removeChild(textArea);
+            }
+        }
+        
+        function openModal(modalId, contextId = null) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            modal.dataset.contextId = contextId || '';
+
+            if (modalId === 'edit-block-modal') {
+                const block = contextId ? appData.blocks.find(b => b.id === contextId) : null;
+                blockModalTitleEl.textContent = block ? "Редагувати блок" : "Створити новий блок";
+                editTitleInput.value = block ? block.title : '';
+                editUkTextarea.value = block ? block.uk : '';
+                editEnTextarea.value = block ? block.en : '';
+            } else if (modalId === 'edit-category-modal') {
+                const category = contextId ? appData.categories.find(c => c.id === contextId) : null;
+                categoryModalTitleEl.textContent = category ? "Редагувати категорію" : "Створити нову категорію";
+                categoryTitleInput.value = category ? category.title : '';
+                categoryDescriptionInput.value = category ? category.description : '';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function handleSaveBlock() {
+            const blockId = blockModalEl.dataset.contextId;
+            const title = editTitleInput.value.trim();
+            if (!title) { alert('Назва блоку не може бути порожньою.'); return; }
+
+            if (blockId) { // Editing
+                const block = appData.blocks.find(b => b.id === blockId);
+                if (block) {
+                    block.title = title;
+                    block.uk = editUkTextarea.value;
+                    block.en = editEnTextarea.value;
+                }
+            } else { // Creating
+                appData.blocks.push({
+                    id: `custom-${Date.now()}`,
+                    category: state.activeCategory,
+                    title,
+                    uk: editUkTextarea.value,
+                    en: editEnTextarea.value
+                });
+            }
+            saveAppData(); closeModal('edit-block-modal'); renderAll();
+        }
+
+        function handleSaveCategory() {
+            const categoryId = categoryModalEl.dataset.contextId;
+            const title = categoryTitleInput.value.trim();
+            if (!title) { alert('Назва категорії не може бути порожньою.'); return; }
+
+            if (categoryId) { // Editing
+                const category = appData.categories.find(c => c.id === categoryId);
+                if (category) {
+                    category.title = title;
+                    category.description = categoryDescriptionInput.value;
+                }
+            } else { // Creating
+                const newCategory = {
+                    id: `custom-cat-${Date.now()}`,
+                    title,
+                    description: categoryDescriptionInput.value
+                };
+                appData.categories.push(newCategory);
+                state.activeCategory = newCategory.id;
+            }
+            saveAppData(); closeModal('edit-category-modal'); renderAll();
+        }
+        
+        function openConfirmDeleteModal(id, type) {
+            itemToDelete = { id, type };
+            confirmMessageEl.textContent = type === 'block'
+                ? 'Ви впевнені, що хочете видалити цей блок?'
+                : 'Ви впевнені? Це також видалить усі блоки в цій категорії.';
+            confirmModalEl.classList.remove('hidden');
+        }
+
+        function closeConfirmDeleteModal() {
+            itemToDelete = { id: null, type: null };
+            confirmModalEl.classList.add('hidden');
+        }
+
+        function executeDelete() {
+            const { id, type } = itemToDelete;
+            if (!id || !type) return;
+
+            if (type === 'block') {
+                appData.blocks = appData.blocks.filter(b => b.id !== id);
+            } else if (type === 'category') {
+                appData.categories = appData.categories.filter(c => c.id !== id);
+                appData.blocks = appData.blocks.filter(b => b.category !== id);
+                if (state.activeCategory === id) {
+                    state.activeCategory = appData.categories[0]?.id || null;
+                }
+            }
+            
+            saveAppData();
+            renderAll();
+            closeConfirmDeleteModal();
+        }
+
+        function handleDragStart(e) {
+            draggedBlockId = e.currentTarget.dataset.id;
+            e.currentTarget.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            if(e.currentTarget && e.currentTarget.classList) {
+                e.currentTarget.classList.remove('dragging');
+            }
+            draggedBlockId = null;
+        }
+
+        function handleDragOver(e) { e.preventDefault(); }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropTargetEl = e.currentTarget.closest('.draggable-block');
+            if (!dropTargetEl || !draggedBlockId || draggedBlockId === dropTargetEl.dataset.id) return;
+
+            const draggedIndex = appData.blocks.findIndex(b => b.id === draggedBlockId);
+            const targetIndex = appData.blocks.findIndex(b => b.id === dropTargetEl.dataset.id);
+            if (draggedIndex === -1 || targetIndex === -1) return;
+
+            const [draggedItem] = appData.blocks.splice(draggedIndex, 1);
+            appData.blocks.splice(targetIndex, 0, draggedItem);
+            
+            saveAppData();
+            renderBlocks();
+        }
+
+        function renderCategories() {
+            categoryListEl.innerHTML = appData.categories.map(cat => {
+                const isCustom = cat.id.startsWith('custom-');
+                const actions = isCustom ? `
+                    <div class="category-actions flex items-center">
+                        <button class="edit-category-btn p-1 text-slate-400 hover:text-sky-600" data-id="${cat.id}" title="Редагувати категорію">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                        </button>
+                        <button class="delete-category-btn p-1 text-slate-400 hover:text-red-600" data-id="${cat.id}" title="Видалити категорію">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>` : '';
+                return `
+                <div class="category-btn flex justify-between items-center rounded-md ${cat.id === state.activeCategory ? 'active' : 'text-slate-600 hover:bg-slate-100'}">
+                    <button class="w-full text-left px-3 py-2.5 text-sm" data-id="${cat.id}">${cat.title}</button>
+                    ${actions}
+                </div>`;
+            }).join('');
+            
+            categoryListEl.querySelectorAll('.category-btn button[data-id]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.activeCategory = btn.dataset.id;
+                    renderAll();
+                });
+            });
+            categoryListEl.querySelectorAll('.edit-category-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); openModal('edit-category-modal', e.currentTarget.dataset.id); }));
+            categoryListEl.querySelectorAll('.delete-category-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); openConfirmDeleteModal(e.currentTarget.dataset.id, 'category'); }));
+        }
+
+        function renderBlocks() {
+            const category = appData.categories.find(c => c.id === state.activeCategory);
+            if (!category) {
+                blocksHeaderEl.innerHTML = '';
+                blocksListEl.innerHTML = '<p class="text-center text-slate-500">Оберіть або створіть категорію.</p>';
+                return;
+            }
+
+            blocksHeaderEl.innerHTML = `
+                <div>
+                    <h2 class="text-2xl font-bold">${category.title}</h2>
+                    <p class="text-sm text-slate-500 mt-1">${category.description}</p>
+                </div>
+                <button id="add-new-block-btn" class="btn-action bg-sky-600 text-white font-semibold text-sm px-4 py-2 rounded-lg hover:bg-sky-700 whitespace-nowrap">
+                    + Додати новий блок
+                </button>
+            `;
+            document.getElementById('add-new-block-btn').addEventListener('click', () => openModal('edit-block-modal'));
+
+            const blocks = appData.blocks.filter(b => b.category === state.activeCategory);
+            blocksListEl.innerHTML = blocks.length > 0 ? blocks.map(block => `
+                <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm draggable-block" draggable="true" data-id="${block.id}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-semibold text-sm text-slate-800">${block.title}</h3>
+                        <div class="flex items-center gap-2">
+                           <button class="copy-block-btn btn-action text-slate-400 hover:text-sky-600 p-1 rounded-md" title="Скопіювати блок"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
+                           <button class="edit-block-btn btn-action text-slate-400 hover:text-sky-600 p-1 rounded-md" title="Редагувати блок"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg></button>
+                           <button class="delete-block-btn btn-action text-slate-400 hover:text-red-600 p-1 rounded-md" title="Видалити блок"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg></button>
+                        </div>
+                    </div>
+                    <p class="message-block text-sm text-slate-600 p-3 bg-slate-50 rounded-md border border-slate-200">${block[state.lang]}</p>
+                </div>
+            `).join('') : '<p class="text-center text-slate-500 pt-8">У цій категорії ще немає блоків. <br>Натисніть "+ Додати новий блок", щоб створити перший.</p>';
+            
+            blocksListEl.querySelectorAll('.draggable-block').forEach(el => {
+                el.addEventListener('dragstart', handleDragStart);
+                el.addEventListener('dragend', handleDragEnd);
+                el.addEventListener('dragover', handleDragOver);
+                el.addEventListener('drop', handleDrop);
+            });
+            
+            blocksListEl.querySelectorAll('.draggable-block').forEach(el => {
+                const id = el.dataset.id;
+                el.querySelector('.copy-block-btn').addEventListener('click', (e) => { e.stopPropagation(); const block = appData.blocks.find(b => b.id === id); copyToClipboard(block[state.lang]); });
+                el.querySelector('.edit-block-btn').addEventListener('click', (e) => { e.stopPropagation(); openModal('edit-block-modal', id) });
+                el.querySelector('.delete-block-btn').addEventListener('click', (e) => { e.stopPropagation(); openConfirmDeleteModal(id, 'block') });
+            });
+        }
+        
+        function switchLang(lang) {
+            state.lang = lang;
+            langUkBtn.classList.toggle('bg-white', lang === 'uk');
+            langUkBtn.classList.toggle('shadow-sm', lang === 'uk');
+            langUkBtn.classList.toggle('text-sky-600', lang === 'uk');
+            langEnBtn.classList.toggle('bg-white', lang === 'en');
+            langEnBtn.classList.toggle('shadow-sm', lang === 'en');
+            langEnBtn.classList.toggle('text-sky-600', lang === 'en');
+            renderAll();
+        }
+        
+        langUkBtn.addEventListener('click', () => switchLang('uk'));
+        langEnBtn.addEventListener('click', () => switchLang('en'));
+
+        // Modal event listeners
+        saveBlockBtn.addEventListener('click', handleSaveBlock);
+        saveCategoryBtn.addEventListener('click', handleSaveCategory);
+        addCategoryBtn.addEventListener('click', () => openModal('edit-category-modal'));
+
+        document.querySelectorAll('[data-close-modal]').forEach(el => {
+            el.addEventListener('click', () => closeModal(el.getAttribute('data-close-modal') || el.closest('.fixed').id));
+        });
+        
+        // Confirmation modal listeners
+        confirmDeleteBtn.addEventListener('click', executeDelete);
+        cancelDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
+        
+        function renderAll() {
+            renderCategories();
+            renderBlocks();
+        }
+
+        // Initial setup
+        loadAppData();
+        renderAll();
+    });
+  </script>
+</body>
+</html>
+
